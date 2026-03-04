@@ -1,33 +1,39 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const REQUEST_TIMEOUT_MS = 12000;
 
+type RequestOptionsWithTimeout = RequestInit & {
+  timeoutMs?: number;
+};
+
 async function fetchAPI<T>(
   path: string,
-  options?: RequestInit
+  options?: RequestOptionsWithTimeout
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (options?.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...requestOptions } = options ?? {};
+
   const timeoutController = new AbortController();
   const timeoutId = window.setTimeout(
     () => timeoutController.abort(),
-    REQUEST_TIMEOUT_MS
+    timeoutMs
   );
 
   let removeAbortBridge: (() => void) | undefined;
-  if (options?.signal) {
+  if (requestOptions.signal) {
     const bridgeAbort = () => timeoutController.abort();
-    options.signal.addEventListener("abort", bridgeAbort);
-    removeAbortBridge = () => options.signal?.removeEventListener("abort", bridgeAbort);
+    requestOptions.signal.addEventListener("abort", bridgeAbort);
+    removeAbortBridge = () => requestOptions.signal?.removeEventListener("abort", bridgeAbort);
   }
 
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       headers,
-      ...options,
+      ...requestOptions,
       signal: timeoutController.signal,
     });
   } catch (error) {
@@ -123,7 +129,10 @@ export const api = {
     fetchAPI<PedidoProcessado[]>("/api/pedidos/processados"),
 
   // Email debug
-  testEmail: () => fetchAPI<{ status: string; message?: string }>("/api/mail/test"),
+  testEmail: () =>
+    fetchAPI<{ status: string; message?: string }>("/api/mail/debug", {
+      timeoutMs: 30000,
+    }),
 };
 
 // ─── WebSocket ─────────────────────────────────────────────
