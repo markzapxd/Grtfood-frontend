@@ -184,6 +184,31 @@ body {
   box-shadow: 0 6px 28px rgba(220,38,38,0.4);
 }
 
+.btn-debug-panel {
+  width: 100%;
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  background: var(--gray-900);
+  color: var(--gray-200);
+  padding: 11px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-debug-panel:hover:not(:disabled) {
+  background: var(--gray-800);
+  color: var(--white);
+}
+
+.btn-debug-panel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ═══════════════════════════════════════════════════════
    PEDIDOS LIST
    ═══════════════════════════════════════════════════════ */

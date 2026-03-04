@@ -123,7 +123,7 @@ export const api = {
     fetchAPI<PedidoProcessado[]>("/api/pedidos/processados"),
 
   // Email debug
-  testEmail: () => fetchAPI<{ status: string }>("/api/mail/test"),
+  testEmail: () => fetchAPI<{ status: string; message?: string }>("/api/mail/test"),
 };
 
 // ─── WebSocket ─────────────────────────────────────────────

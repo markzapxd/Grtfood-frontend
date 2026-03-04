@@ -39,6 +39,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [confirmStep, setConfirmStep] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successPlayer, setSuccessPlayer] = useState<SuccessPlayer | null>(null);
 
@@ -135,6 +136,20 @@ export default function Home() {
     try { setPedidos(await api.getPedidos()); } catch {}
   };
 
+  const enviarEmailDebug = async () => {
+    if (sendingEmail) return;
+    setSendingEmail(true);
+    try {
+      const result = await api.testEmail();
+      toast(result.message || "E-mail debug enviado com sucesso!");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Falha ao enviar e-mail debug";
+      toast(msg, "err");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const deletar = async (id: number) => {
     const confirmed = window.confirm("Tem certeza que deseja excluir este pedido de almoço?");
     if (!confirmed) return;
@@ -214,6 +229,9 @@ export default function Home() {
           </div>
           <button className="btn-fazer-panel" onClick={openModal}>
             FAZER PEDIDO
+          </button>
+          <button className="btn-debug-panel" disabled={sendingEmail} onClick={enviarEmailDebug}>
+            {sendingEmail ? "ENVIANDO EMAIL..." : "ENVIAR EMAIL DEBUG"}
           </button>
         </aside>
       </div>
