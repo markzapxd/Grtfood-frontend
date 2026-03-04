@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function fetchAPI<T>(
   path: string,
@@ -89,11 +89,21 @@ export const api = {
     fetchAPI<void>(`/api/pedidos/${id}`, { method: "DELETE" }),
   getPedidosProcessados: () =>
     fetchAPI<PedidoProcessado[]>("/api/pedidos/processados"),
+
+  // Email debug
+  testEmail: () => fetchAPI<{ status: string }>("/api/mail/test"),
 };
 
 // ─── WebSocket ─────────────────────────────────────────────
 export function createWS(onMessage: (msg: { tipo: string; dados: unknown }) => void) {
-  const wsUrl = API_BASE.replace(/^http/, "ws") + "/ws";
+  let wsUrl = "";
+  if (API_BASE) {
+    wsUrl = API_BASE.replace(/^http/, "ws") + "/ws";
+  } else {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    wsUrl = `${protocol}//${window.location.host}/ws`;
+  }
+
   const ws = new WebSocket(wsUrl);
   ws.onmessage = (ev) => {
     try {
