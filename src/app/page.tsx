@@ -11,13 +11,8 @@ function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) 
   return (
     <div className="toast-container">
       {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`toast toast-${t.type}`}
-          onAnimationEnd={(e) => {
-            if (e.animationName === "fadeOut") onRemove(t.id);
-          }}
-        >
+        <div key={t.id} className={`toast toast-${t.type}`}
+          onAnimationEnd={(e) => { if (e.animationName === "fadeOut") onRemove(t.id); }}>
           {t.msg}
         </div>
       ))}
@@ -25,8 +20,6 @@ function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) 
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-//  MAIN PAGE — GRT Food Plus
 // ═══════════════════════════════════════════════════════════
 export default function Home() {
   const [estado, setEstado] = useState<string>("Fechado");
@@ -44,19 +37,17 @@ export default function Home() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // ─── Fetch initial data ──────────────────────────────────
+  // ─── Fetch data ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     try {
       const [est, usrs, peds] = await Promise.all([
-        api.getEstado(),
-        api.getUsuarios(),
-        api.getPedidos(),
+        api.getEstado(), api.getUsuarios(), api.getPedidos(),
       ]);
       setEstado(est.estado);
       setUsuarios(usrs);
       setPedidos(peds);
     } catch (err: unknown) {
-      addToast(`Erro ao carregar dados: ${err instanceof Error ? err.message : "desconhecido"}`, "error");
+      addToast(`Erro: ${err instanceof Error ? err.message : "desconhecido"}`, "error");
     } finally {
       setLoading(false);
     }
@@ -67,24 +58,17 @@ export default function Home() {
   // ─── WebSocket ──────────────────────────────────────────
   useEffect(() => {
     const ws = createWS((msg) => {
-      if (msg.tipo === "estado") {
-        setEstado(msg.dados as string);
-      } else if (msg.tipo === "pedidos") {
-        setPedidos(msg.dados as Pedido[]);
-      }
+      if (msg.tipo === "estado") setEstado(msg.dados as string);
+      if (msg.tipo === "pedidos") setPedidos(msg.dados as Pedido[]);
     });
     return () => ws.close();
   }, []);
 
-  // ─── Handlers ───────────────────────────────────────────
+  // ─── Handlers ──────────────────────────────────────────
   const toggleUser = (id: number) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
-  };
-
-  const removeSelected = (id: number) => {
-    setSelectedIds((prev) => prev.filter((x) => x !== id));
   };
 
   const fazerPedidos = async () => {
@@ -101,7 +85,6 @@ export default function Home() {
     if (ok > 0) addToast(`${ok} pedido(s) registrado(s)!`);
     if (fail > 0) addToast(`${fail} pedido(s) falharam.`, "error");
     setSending(false);
-    // Reload pedidos
     try { setPedidos(await api.getPedidos()); } catch {}
   };
 
@@ -124,19 +107,18 @@ export default function Home() {
     }
   };
 
-  const selectedUsers = usuarios.filter((u) => selectedIds.includes(u.id));
   const isOpen = estado === "Aberto";
 
   if (loading) {
     return (
-      <div className="app-wrap">
-        <div className="loader"><div className="spinner" /></div>
+      <div className="loading-screen">
+        <div className="spinner" />
       </div>
     );
   }
 
   return (
-    <div className="app-wrap fade-in">
+    <div className="fade-in">
       <Toasts toasts={toasts} onRemove={removeToast} />
 
       {/* ═══ HEADER ═══ */}
@@ -152,75 +134,16 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ═══ STATS ═══ */}
-      <div className="stats">
-        <div className="glass stat-card">
-          <div className="stat-number">{pedidos.length}</div>
-          <div className="stat-label">Pedidos Hoje</div>
-        </div>
-        <div className="glass stat-card">
-          <div className="stat-number">{usuarios.length}</div>
-          <div className="stat-label">Usuários</div>
-        </div>
+      {/* ═══ INFO BAR ═══ */}
+      <div className="info-bar">
+        <span className="info-dot" />
+        Total de pedidos realizados até o momento: <strong>{pedidos.length}</strong>
       </div>
 
-      {/* ═══ ORDER PANEL ═══ */}
-      <div className="glass order-panel">
-        <h2>📋 Fazer Pedido</h2>
-
-        {/* Selected chips */}
-        <div className="chips">
-          {selectedUsers.map((u) => (
-            <span key={u.id} className="chip">
-              {u.nome}
-              <button onClick={() => removeSelected(u.id)}>&times;</button>
-            </span>
-          ))}
-        </div>
-
-        {/* Multi-select */}
-        <div className="select-wrapper">
-          <select
-            multiple
-            size={6}
-            value={selectedIds.map(String)}
-            onChange={(e) => {
-              const opts = Array.from(e.target.selectedOptions);
-              const clicked = parseInt(opts[opts.length - 1]?.value || "0");
-              if (clicked) toggleUser(clicked);
-            }}
-          >
-            {usuarios.map((u) => (
-              <option key={u.id} value={u.id}>
-                {selectedIds.includes(u.id) ? "✓ " : "  "}{u.nome}
-              </option>
-            ))}
-          </select>
-        </div>
-        <p className="select-hint">Clique nos nomes para selecionar (clique de novo para remover)</p>
-
-        <button
-          className="btn btn-primary"
-          onClick={fazerPedidos}
-          disabled={sending || selectedIds.length === 0}
-        >
-          {sending ? <><span className="spinner-sm" /> Registrando...</> : "🍽️ Registrar Pedidos"}
-        </button>
-
-        <div className="actions-row">
-          <button className="btn btn-debug" onClick={enviarEmailDebug}>
-            📧 Enviar Email (Debug)
-          </button>
-        </div>
-      </div>
-
-      {/* ═══ ORDERS LIST ═══ */}
-      <div className="glass orders-section">
-        <h2>
-          Pedidos de Hoje
-          <span className="orders-count">{pedidos.length}</span>
-        </h2>
-        <div className="order-list">
+      {/* ═══ MAIN 2-COLUMN LAYOUT ═══ */}
+      <main className="main-grid">
+        {/* LEFT — Lista de Pedidos */}
+        <div className="pedidos-col">
           {pedidos.length === 0 ? (
             <div className="empty-state">
               <div className="emoji">🍽️</div>
@@ -228,18 +151,65 @@ export default function Home() {
             </div>
           ) : (
             pedidos.map((p) => (
-              <div key={p.id} className="order-item">
-                <div>
-                  <div className="order-name">{p.usuario}</div>
-                  <div className="order-time">{p.dataDoPedido || ""}</div>
-                </div>
-                <button className="btn btn-danger-sm" onClick={() => deletarPedido(p.id)}>
-                  ✕
-                </button>
+              <div key={p.id} className="pedido-row">
+                <span className="pedido-nome">{p.usuario}</span>
+                <button className="btn-x" onClick={() => deletarPedido(p.id)} title="Remover">×</button>
               </div>
             ))
           )}
         </div>
+
+        {/* RIGHT — Cardápio + Ações */}
+        <div className="sidebar-col">
+          {/* Cardápio Card */}
+          <div className="glass card-cardapio">
+            <div className="card-title">Cardápio</div>
+            <div className="cardapio-item">ALMOÇO</div>
+          </div>
+
+          {/* Select Users */}
+          <div className="glass card-select">
+            <select
+              className="user-select"
+              multiple
+              size={6}
+              value={selectedIds.map(String)}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (val) toggleUser(val);
+              }}
+            >
+              {usuarios.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {selectedIds.includes(u.id) ? "✓ " : "  "}{u.nome}
+                </option>
+              ))}
+            </select>
+            <p className="select-hint">
+              {selectedIds.length > 0
+                ? `${selectedIds.length} selecionado(s)`
+                : "Clique para selecionar"}
+            </p>
+          </div>
+
+          {/* Buttons */}
+          <button
+            className="btn-fazer"
+            onClick={fazerPedidos}
+            disabled={sending || selectedIds.length === 0}
+          >
+            {sending ? "Enviando..." : "Fazer Pedido"}
+          </button>
+
+          <button className="btn-email" onClick={enviarEmailDebug}>
+            Enviar Email (Debug)
+          </button>
+        </div>
+      </main>
+
+      {/* ═══ FOOTER STATUS ═══ */}
+      <div className={`footer-status ${isOpen ? "open" : "closed"}`}>
+        {isOpen ? "Pedidos abertos — faça seu pedido! 🍽️" : "Pedidos encerrados por hoje 😄"}
       </div>
     </div>
   );
