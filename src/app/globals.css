@@ -118,9 +118,9 @@ body {
    BOTTOM BAR (fixed)
    ═══════════════════════════════════════════════════════ */
 .bottom-bar {
-  position: fixed; bottom: 48px; left: 0;
-  padding: 12px 24px;
-  display: flex; gap: 10px; z-index: 50;
+  position: fixed; right: 16px; bottom: 8px;
+  padding: 0;
+  display: flex; gap: 10px; z-index: 60;
 }
 .btn-fazer {
   padding: 14px 32px; border: none; border-radius: var(--radius-sm);
