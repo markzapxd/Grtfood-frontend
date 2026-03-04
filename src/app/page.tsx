@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, createWS, type Pedido, type Usuario } from "@/lib/api";
 
-// ─── Toast system ──────────────────────────────────────────
-type Toast = { id: number; msg: string; type: "success" | "error" | "info" };
-let toastId = 0;
+// ─── Toast ─────────────────────────────────────────────────
+type Toast = { id: number; msg: string; type: "ok" | "err" };
+let tid = 0;
 
-function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
+function Toasts({ items, onDone }: { items: Toast[]; onDone: (id: number) => void }) {
   return (
-    <div className="toast-container">
-      {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.type}`}
-          onAnimationEnd={(e) => { if (e.animationName === "fadeOut") onRemove(t.id); }}>
+    <div className="toasts">
+      {items.map((t) => (
+        <div key={t.id} className={`toast ${t.type}`}
+          onAnimationEnd={(e) => { if (e.animationName === "toastOut") onDone(t.id); }}>
           {t.msg}
         </div>
       ))}
@@ -22,22 +22,22 @@ function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) 
 
 // ═══════════════════════════════════════════════════════════
 export default function Home() {
-  const [estado, setEstado] = useState<string>("Fechado");
+  const [estado, setEstado] = useState("Fechado");
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = useCallback((msg: string, type: Toast["type"] = "success") => {
-    setToasts((prev) => [...prev, { id: ++toastId, msg, type }]);
-  }, []);
-  const removeToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [sending, setSending] = useState(false);
+
+  const toast = useCallback((msg: string, type: Toast["type"] = "ok") => {
+    setToasts((p) => [...p, { id: ++tid, msg, type }]);
   }, []);
 
-  // ─── Fetch data ──────────────────────────────────────────
+  // ─── Fetch ───────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     try {
       const [est, usrs, peds] = await Promise.all([
@@ -46,16 +46,13 @@ export default function Home() {
       setEstado(est.estado);
       setUsuarios(usrs);
       setPedidos(peds);
-    } catch (err: unknown) {
-      addToast(`Erro: ${err instanceof Error ? err.message : "desconhecido"}`, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast]);
+    } catch { toast("Erro ao carregar dados", "err"); }
+    finally { setLoading(false); }
+  }, [toast]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // ─── WebSocket ──────────────────────────────────────────
+  // ─── WebSocket ───────────────────────────────────────────
   useEffect(() => {
     const ws = createWS((msg) => {
       if (msg.tipo === "estado") setEstado(msg.dados as string);
@@ -64,153 +61,132 @@ export default function Home() {
     return () => ws.close();
   }, []);
 
-  // ─── Handlers ──────────────────────────────────────────
+  // ─── Handlers ────────────────────────────────────────────
   const toggleUser = (id: number) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
   };
 
-  const fazerPedidos = async () => {
+  const submitPedidos = async () => {
     if (selectedIds.length === 0) return;
     setSending(true);
-    let ok = 0, fail = 0;
+    let ok = 0;
     for (const uid of selectedIds) {
-      try {
-        await api.criarPedido(uid, { items: ["Almoço"], multiplos: {} }, "");
-        ok++;
-      } catch { fail++; }
+      try { await api.criarPedido(uid, { items: ["Almoço"], multiplos: {} }, ""); ok++; } catch {}
     }
     setSelectedIds([]);
-    if (ok > 0) addToast(`${ok} pedido(s) registrado(s)!`);
-    if (fail > 0) addToast(`${fail} pedido(s) falharam.`, "error");
+    setModalOpen(false);
     setSending(false);
+    if (ok > 0) toast(`${ok} pedido(s) registrado(s)!`);
     try { setPedidos(await api.getPedidos()); } catch {}
   };
 
-  const deletarPedido = async (id: number) => {
+  const deletar = async (id: number) => {
     try {
       await api.deletarPedido(id);
-      setPedidos((prev) => prev.filter((p) => p.id !== id));
-      addToast("Pedido removido!");
-    } catch (e: unknown) {
-      addToast(e instanceof Error ? e.message : "Erro", "error");
-    }
+      setPedidos((p) => p.filter((x) => x.id !== id));
+      toast("Removido");
+    } catch { toast("Erro", "err"); }
   };
 
-  const enviarEmailDebug = async () => {
-    try {
-      await api.testEmail();
-      addToast("Email de teste enviado!", "info");
-    } catch (e: unknown) {
-      addToast(e instanceof Error ? e.message : "Erro ao enviar email", "error");
-    }
+  const emailDebug = async () => {
+    try { await api.testEmail(); toast("Email enviado!"); }
+    catch (e: unknown) { toast(e instanceof Error ? e.message : "Erro", "err"); }
   };
 
   const isOpen = estado === "Aberto";
 
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="spinner" />
-      </div>
-    );
-  }
+  if (loading) return <div className="loading"><div className="spinner" /></div>;
 
   return (
-    <div className="fade-in">
-      <Toasts toasts={toasts} onRemove={removeToast} />
+    <>
+      <Toasts items={toasts} onDone={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
 
       {/* ═══ HEADER ═══ */}
       <header className="header">
         <div className="logo">
-          <div className="logo-icon">G</div>
-          <span className="logo-text">GRT Food</span>
-          <span className="logo-badge">Plus</span>
+          <div className="logo-mark">G</div>
+          <span className="logo-name">GRT Food</span>
+          <span className="logo-plus">Plus</span>
         </div>
-        <div className="header-status">
-          <div className={`status-dot ${isOpen ? "open" : "closed"}`} />
-          <span>{isOpen ? "Pedidos Abertos" : "Pedidos Encerrados"}</span>
+        <div className="status">
+          <span className={`dot ${isOpen ? "on" : ""}`} />
+          {isOpen ? "Aberto" : "Encerrado"}
         </div>
       </header>
 
-      {/* ═══ INFO BAR ═══ */}
-      <div className="info-bar">
-        <span className="info-dot" />
+      {/* ═══ COUNTER BAR ═══ */}
+      <div className="counter-bar">
         Total de pedidos realizados até o momento: <strong>{pedidos.length}</strong>
       </div>
 
-      {/* ═══ MAIN 2-COLUMN LAYOUT ═══ */}
-      <main className="main-grid">
-        {/* LEFT — Lista de Pedidos */}
-        <div className="pedidos-col">
-          {pedidos.length === 0 ? (
-            <div className="empty-state">
-              <div className="emoji">🍽️</div>
-              <p>Nenhum pedido registrado ainda hoje.</p>
+      {/* ═══ PEDIDOS LIST ═══ */}
+      <div className="list-area">
+        {pedidos.length === 0 ? (
+          <div className="empty">
+            <span>🍽️</span>
+            <p>Nenhum pedido registrado hoje.</p>
+          </div>
+        ) : (
+          pedidos.map((p) => (
+            <div key={p.id} className="row">
+              <span>{p.usuario}</span>
+              <button className="row-x" onClick={() => deletar(p.id)}>×</button>
             </div>
-          ) : (
-            pedidos.map((p) => (
-              <div key={p.id} className="pedido-row">
-                <span className="pedido-nome">{p.usuario}</span>
-                <button className="btn-x" onClick={() => deletarPedido(p.id)} title="Remover">×</button>
-              </div>
-            ))
-          )}
-        </div>
+          ))
+        )}
+      </div>
 
-        {/* RIGHT — Cardápio + Ações */}
-        <div className="sidebar-col">
-          {/* Cardápio Card */}
-          <div className="glass card-cardapio">
-            <div className="card-title">Cardápio</div>
-            <div className="cardapio-item">ALMOÇO</div>
-          </div>
-
-          {/* Select Users */}
-          <div className="glass card-select">
-            <select
-              className="user-select"
-              multiple
-              size={6}
-              value={selectedIds.map(String)}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                if (val) toggleUser(val);
-              }}
-            >
-              {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {selectedIds.includes(u.id) ? "✓ " : "  "}{u.nome}
-                </option>
-              ))}
-            </select>
-            <p className="select-hint">
-              {selectedIds.length > 0
-                ? `${selectedIds.length} selecionado(s)`
-                : "Clique para selecionar"}
-            </p>
-          </div>
-
-          {/* Buttons */}
-          <button
-            className="btn-fazer"
-            onClick={fazerPedidos}
-            disabled={sending || selectedIds.length === 0}
-          >
-            {sending ? "Enviando..." : "Fazer Pedido"}
-          </button>
-
-          <button className="btn-email" onClick={enviarEmailDebug}>
-            Enviar Email (Debug)
-          </button>
-        </div>
-      </main>
+      {/* ═══ BOTTOM BUTTONS ═══ */}
+      <div className="bottom-bar">
+        <button className="btn-fazer" onClick={() => setModalOpen(true)}>
+          FAZER PEDIDOS
+        </button>
+        <button className="btn-debug" onClick={emailDebug}>
+          📧 Debug Email
+        </button>
+      </div>
 
       {/* ═══ FOOTER STATUS ═══ */}
-      <div className={`footer-status ${isOpen ? "open" : "closed"}`}>
+      <div className={`footer ${isOpen ? "on" : ""}`}>
         {isOpen ? "Pedidos abertos — faça seu pedido! 🍽️" : "Pedidos encerrados por hoje 😄"}
       </div>
-    </div>
+
+      {/* ═══ MODAL ═══ */}
+      {modalOpen && (
+        <div className="overlay" onClick={() => setModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Selecionar Almoços</h2>
+              <button className="modal-close" onClick={() => setModalOpen(false)}>×</button>
+            </div>
+
+            <p className="modal-hint">
+              Clique nos nomes para selecionar. {selectedIds.length > 0 && <strong>{selectedIds.length} selecionado(s)</strong>}
+            </p>
+
+            <div className="modal-list">
+              {usuarios.map((u) => (
+                <div
+                  key={u.id}
+                  className={`modal-item ${selectedIds.includes(u.id) ? "selected" : ""}`}
+                  onClick={() => toggleUser(u.id)}
+                >
+                  <span className="check">{selectedIds.includes(u.id) ? "✓" : ""}</span>
+                  <span>{u.nome}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="btn-confirm"
+              disabled={sending || selectedIds.length === 0}
+              onClick={submitPedidos}
+            >
+              {sending ? "Enviando..." : `Registrar ${selectedIds.length} pedido(s)`}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
