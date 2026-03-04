@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { api, createWS, type Pedido, type Usuario } from "@/lib/api";
 
 // ─── Toast ─────────────────────────────────────────────────
@@ -31,7 +32,9 @@ export default function Home() {
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [confirmStep, setConfirmStep] = useState(false);
   const [sending, setSending] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
 
   const toast = useCallback((msg: string, type: Toast["type"] = "ok") => {
     setToasts((p) => [...p, { id: ++tid, msg, type }]);
@@ -61,9 +64,39 @@ export default function Home() {
     return () => ws.close();
   }, []);
 
+  useEffect(() => {
+    if (!successOpen) return;
+    const timeoutId = window.setTimeout(() => setSuccessOpen(false), 2200);
+    return () => window.clearTimeout(timeoutId);
+  }, [successOpen]);
+
   // ─── Handlers ────────────────────────────────────────────
   const toggleUser = (id: number) => {
     setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  };
+
+  const openModal = () => {
+    setConfirmStep(false);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (sending) return;
+    setConfirmStep(false);
+    setModalOpen(false);
+  };
+
+  const goToConfirm = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmStep(true);
+  };
+
+  const removeFromConfirm = (id: number) => {
+    if (selectedIds.length <= 1) {
+      toast("Deixe ao menos 1 pessoa selecionada", "err");
+      return;
+    }
+    setSelectedIds((p) => p.filter((x) => x !== id));
   };
 
   const submitPedidos = async () => {
@@ -74,9 +107,13 @@ export default function Home() {
       try { await api.criarPedido(uid, { items: ["Almoço"], multiplos: {} }, ""); ok++; } catch {}
     }
     setSelectedIds([]);
+    setConfirmStep(false);
     setModalOpen(false);
     setSending(false);
-    if (ok > 0) toast(`${ok} pedido(s) registrado(s)!`);
+    if (ok > 0) {
+      toast(`${ok} pedido(s) registrado(s)!`);
+      setSuccessOpen(true);
+    }
     try { setPedidos(await api.getPedidos()); } catch {}
   };
 
@@ -89,6 +126,7 @@ export default function Home() {
   };
 
   const isOpen = estado === "Aberto";
+  const selectedUsers = usuarios.filter((u) => selectedIds.includes(u.id));
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
@@ -96,10 +134,19 @@ export default function Home() {
     <>
       <Toasts items={toasts} onDone={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
 
+      {successOpen && (
+        <div className="success-overlay" onClick={() => setSuccessOpen(false)}>
+          <div className="success-card" onClick={(e) => e.stopPropagation()}>
+            <DotLottieReact src="/Success.lottie" autoplay loop={false} className="success-lottie" />
+            <p>Pedido registrado com sucesso!</p>
+          </div>
+        </div>
+      )}
+
       {/* ═══ HEADER ═══ */}
       <header className="header">
         <div className="logo">
-          <div className="logo-mark">G</div>
+          <div className="logo-mark"><img src="/logo.svg" alt="Logo GRT Food" /></div>
           <span className="logo-name">GRT Food</span>
           <span className="logo-plus">Plus</span>
         </div>
@@ -134,11 +181,11 @@ export default function Home() {
         </section>
 
         <aside className="menu-column">
-          <h2 className="menu-  ">Cardápio</h2>
+          <h2 className="menu-title">Cardápio</h2>
           <div className="menu-item-display">
             Almoço
           </div>
-          <button className="btn-fazer-panel" onClick={() => setModalOpen(true)}>
+          <button className="btn-fazer-panel" onClick={openModal}>
             FAZER PEDIDO
           </button>
         </aside>
@@ -147,37 +194,75 @@ export default function Home() {
 
       {/* ═══ MODAL ═══ */}
       {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
+        <div className="overlay" onClick={closeModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Selecionar Almoços</h2>
-              <button className="modal-close" onClick={() => setModalOpen(false)}>×</button>
+              <h2>{confirmStep ? "Confirmar Pedidos" : "Selecionar Almoços"}</h2>
+              <button className="modal-close" onClick={closeModal}>×</button>
             </div>
 
-            <p className="modal-hint">
-              Clique nos nomes para selecionar. {selectedIds.length > 0 && <strong>{selectedIds.length} selecionado(s)</strong>}
-            </p>
+            {!confirmStep ? (
+              <>
+                <p className="modal-hint">
+                  Clique nos nomes para selecionar. {selectedIds.length > 0 && <strong>{selectedIds.length} selecionado(s)</strong>}
+                </p>
 
-            <div className="modal-list">
-              {usuarios.map((u) => (
-                <div
-                  key={u.id}
-                  className={`modal-item ${selectedIds.includes(u.id) ? "selected" : ""}`}
-                  onClick={() => toggleUser(u.id)}
-                >
-                  <span className="check">{selectedIds.includes(u.id) ? "✓" : ""}</span>
-                  <span>{u.nome}</span>
+                <div className="modal-list">
+                  {usuarios.map((u) => (
+                    <div
+                      key={u.id}
+                      className={`modal-item ${selectedIds.includes(u.id) ? "selected" : ""}`}
+                      onClick={() => toggleUser(u.id)}
+                    >
+                      <span className="check">{selectedIds.includes(u.id) ? "✓" : ""}</span>
+                      <span>{u.nome}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <button
-              className="btn-confirm"
-              disabled={sending || selectedIds.length === 0}
-              onClick={submitPedidos}
-            >
-              {sending ? "Enviando..." : `Registrar ${selectedIds.length} pedido(s)`}
-            </button>
+                <button
+                  className="btn-confirm"
+                  disabled={sending || selectedIds.length === 0}
+                  onClick={goToConfirm}
+                >
+                  Continuar com {selectedIds.length} pessoa(s)
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="modal-hint">
+                <strong>Tem certeza que quer adicionar essa(s) pessoa(s)?</strong>.
+                </p>
+
+                <div className="confirm-list">
+                  {selectedUsers.map((u) => (
+                    <div key={u.id} className="confirm-item">
+                      <span>{u.nome}</span>
+                      <button
+                        className="confirm-remove"
+                        disabled={selectedIds.length === 1 || sending}
+                        onClick={() => removeFromConfirm(u.id)}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="confirm-actions">
+                  <button className="btn-secondary" disabled={sending} onClick={() => setConfirmStep(false)}>
+                    Voltar
+                  </button>
+                  <button
+                    className="btn-confirm"
+                    disabled={sending || selectedIds.length === 0}
+                    onClick={submitPedidos}
+                  >
+                    {sending ? "Enviando..." : `Confirmar ${selectedIds.length} pedido(s)`}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

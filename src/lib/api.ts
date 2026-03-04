@@ -1,4 +1,5 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const REQUEST_TIMEOUT_MS = 12000;
 
 async function fetchAPI<T>(
   path: string,
@@ -9,10 +10,36 @@ async function fetchAPI<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers,
-    ...options,
-  });
+  const timeoutController = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => timeoutController.abort(),
+    REQUEST_TIMEOUT_MS
+  );
+
+  let removeAbortBridge: (() => void) | undefined;
+  if (options?.signal) {
+    const bridgeAbort = () => timeoutController.abort();
+    options.signal.addEventListener("abort", bridgeAbort);
+    removeAbortBridge = () => options.signal?.removeEventListener("abort", bridgeAbort);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      headers,
+      ...options,
+      signal: timeoutController.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Tempo de resposta da API excedido");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+    removeAbortBridge?.();
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || res.statusText);
