@@ -131,6 +131,7 @@ export const api = {
   // Email debug
   testEmail: () =>
     fetchAPI<{ status: string; message?: string }>("/api/mail/debug", {
+      method: "POST",
       timeoutMs: 30000,
     }),
 };
