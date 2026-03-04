@@ -136,6 +136,9 @@ export default function Home() {
   };
 
   const deletar = async (id: number) => {
+    const confirmed = window.confirm("Tem certeza que deseja excluir este pedido de almoço?");
+    if (!confirmed) return;
+
     try {
       await api.deletarPedido(id);
       setPedidos((p) => p.filter((x) => x.id !== id));
