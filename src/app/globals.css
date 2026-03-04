@@ -135,6 +135,42 @@ body {
   border-color: var(--gray-600);
 }
 
+.menu-item-display {
+  width: 100%;
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  background: var(--gray-900);
+  color: var(--white);
+  padding: 10px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 32px;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.btn-fazer-panel {
+  width: 100%;
+  margin-top: auto;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--red);
+  color: white;
+  padding: 12px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px var(--red-glow);
+}
+
+.btn-fazer-panel:hover {
+  background: #ef4444;
+  box-shadow: 0 6px 28px rgba(220,38,38,0.4);
+}
+
 /* ═══════════════════════════════════════════════════════
    PEDIDOS LIST
    ═══════════════════════════════════════════════════════ */
@@ -206,6 +242,14 @@ body {
 
   .menu-item {
     font-size: 24px;
+  }
+
+  .menu-item-display {
+    font-size: 24px;
+  }
+
+  .btn-fazer-panel {
+    margin-top: 12px;
   }
 
   .list-area {

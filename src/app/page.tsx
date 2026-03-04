@@ -135,8 +135,11 @@ export default function Home() {
 
         <aside className="menu-column">
           <h2 className="menu-title">Cardápio</h2>
-          <button className="menu-item" onClick={() => setModalOpen(true)}>
+          <div className="menu-item-display">
             ALMOÇO
+          </div>
+          <button className="btn-fazer-panel" onClick={() => setModalOpen(true)}>
+            FAZER PEDIDO
           </button>
         </aside>
       </div>
