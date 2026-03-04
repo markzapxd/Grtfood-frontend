@@ -141,9 +141,9 @@ body {
   border-radius: var(--radius-sm);
   background: var(--gray-900);
   color: var(--white);
-  padding: 10px 14px;
+  padding: 6px 12px;
   font-family: 'Inter', sans-serif;
-  font-size: 32px;
+  font-size: 22px;
   font-weight: 300;
   letter-spacing: 0.5px;
   text-align: center;

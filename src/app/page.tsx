@@ -134,9 +134,9 @@ export default function Home() {
         </section>
 
         <aside className="menu-column">
-          <h2 className="menu-title">Cardápio</h2>
+          <h2 className="menu-  ">Cardápio</h2>
           <div className="menu-item-display">
-            ALMOÇO
+            Almoço
           </div>
           <button className="btn-fazer-panel" onClick={() => setModalOpen(true)}>
             FAZER PEDIDO
@@ -144,10 +144,6 @@ export default function Home() {
         </aside>
       </div>
 
-      {/* ═══ FOOTER STATUS ═══ */}
-      <div className={`footer ${isOpen ? "on" : ""}`}>
-        {isOpen ? "Pedidos abertos — faça seu pedido! 🍽️" : "Pedidos encerrados por hoje 😄"}
-      </div>
 
       {/* ═══ MODAL ═══ */}
       {modalOpen && (
