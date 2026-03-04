@@ -8,6 +8,11 @@ import { api, createWS, type Pedido, type Usuario } from "@/lib/api";
 type Toast = { id: number; msg: string; type: "ok" | "err" };
 let tid = 0;
 
+type SuccessPlayer = {
+  addEventListener: (event: "complete", listener: () => void) => void;
+  removeEventListener: (event: "complete", listener: () => void) => void;
+};
+
 function Toasts({ items, onDone }: { items: Toast[]; onDone: (id: number) => void }) {
   return (
     <div className="toasts">
@@ -35,6 +40,7 @@ export default function Home() {
   const [confirmStep, setConfirmStep] = useState(false);
   const [sending, setSending] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
+  const [successPlayer, setSuccessPlayer] = useState<SuccessPlayer | null>(null);
 
   const toast = useCallback((msg: string, type: Toast["type"] = "ok") => {
     setToasts((p) => [...p, { id: ++tid, msg, type }]);
@@ -66,9 +72,21 @@ export default function Home() {
 
   useEffect(() => {
     if (!successOpen) return;
-    const timeoutId = window.setTimeout(() => setSuccessOpen(false), 2200);
-    return () => window.clearTimeout(timeoutId);
-  }, [successOpen]);
+
+    const fallbackTimeoutId = window.setTimeout(() => setSuccessOpen(false), 6500);
+
+    if (!successPlayer) {
+      return () => window.clearTimeout(fallbackTimeoutId);
+    }
+
+    const handleComplete = () => setSuccessOpen(false);
+    successPlayer.addEventListener("complete", handleComplete);
+
+    return () => {
+      window.clearTimeout(fallbackTimeoutId);
+      successPlayer.removeEventListener("complete", handleComplete);
+    };
+  }, [successOpen, successPlayer]);
 
   // ─── Handlers ────────────────────────────────────────────
   const toggleUser = (id: number) => {
@@ -137,7 +155,13 @@ export default function Home() {
       {successOpen && (
         <div className="success-overlay" onClick={() => setSuccessOpen(false)}>
           <div className="success-card" onClick={(e) => e.stopPropagation()}>
-            <DotLottieReact src="/Success.lottie" autoplay loop={false} className="success-lottie" />
+            <DotLottieReact
+              src="/Success.lottie"
+              autoplay
+              loop={false}
+              className="success-lottie"
+              dotLottieRefCallback={(dotLottie) => setSuccessPlayer(dotLottie as SuccessPlayer | null)}
+            />
             <p>Pedido registrado com sucesso!</p>
           </div>
         </div>
