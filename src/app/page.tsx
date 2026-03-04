@@ -88,11 +88,6 @@ export default function Home() {
     } catch { toast("Erro", "err"); }
   };
 
-  const emailDebug = async () => {
-    try { await api.testEmail(); toast("Email enviado!"); }
-    catch (e: unknown) { toast(e instanceof Error ? e.message : "Erro", "err"); }
-  };
-
   const isOpen = estado === "Aberto";
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
@@ -119,31 +114,31 @@ export default function Home() {
         Total de pedidos realizados até o momento: <strong>{pedidos.length}</strong>
       </div>
 
-      {/* ═══ PEDIDOS LIST ═══ */}
-      <div className="list-area">
-        {pedidos.length === 0 ? (
-          <div className="empty">
-            <span>🍽️</span>
-            <p>Nenhum pedido registrado hoje.</p>
+      <div className="content-layout">
+        <section className="list-column">
+          <div className="list-area">
+            {pedidos.length === 0 ? (
+              <div className="empty">
+                <span>🍽️</span>
+                <p>Nenhum pedido registrado hoje.</p>
+              </div>
+            ) : (
+              pedidos.map((p) => (
+                <div key={p.id} className="row">
+                  <span>{p.usuario}</span>
+                  <button className="row-x" onClick={() => deletar(p.id)}>×</button>
+                </div>
+              ))
+            )}
           </div>
-        ) : (
-          pedidos.map((p) => (
-            <div key={p.id} className="row">
-              <span>{p.usuario}</span>
-              <button className="row-x" onClick={() => deletar(p.id)}>×</button>
-            </div>
-          ))
-        )}
-      </div>
+        </section>
 
-      {/* ═══ BOTTOM BUTTONS ═══ */}
-      <div className="bottom-bar">
-        <button className="btn-fazer" onClick={() => setModalOpen(true)}>
-          FAZER PEDIDOS
-        </button>
-        <button className="btn-debug" onClick={emailDebug}>
-          📧 Debug Email
-        </button>
+        <aside className="menu-column">
+          <h2 className="menu-title">Cardápio</h2>
+          <button className="menu-item" onClick={() => setModalOpen(true)}>
+            ALMOÇO
+          </button>
+        </aside>
       </div>
 
       {/* ═══ FOOTER STATUS ═══ */}

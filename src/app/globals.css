@@ -28,6 +28,7 @@ body {
   background: var(--black);
   color: var(--white);
   min-height: 100vh;
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -85,15 +86,65 @@ body {
 .counter-bar strong { color: white; }
 
 /* ═══════════════════════════════════════════════════════
+   MAIN LAYOUT
+   ═══════════════════════════════════════════════════════ */
+.content-layout {
+  height: calc(100vh - 56px - 40px - 44px);
+  display: grid;
+  grid-template-columns: 1fr 300px;
+}
+
+.list-column {
+  min-width: 0;
+  border-right: 1px solid var(--gray-800);
+}
+
+.menu-column {
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: var(--gray-950);
+}
+
+.menu-title {
+  font-size: 38px;
+  font-weight: 300;
+  color: var(--gray-400);
+  line-height: 1;
+}
+
+.menu-item {
+  width: 100%;
+  border: 1px solid var(--gray-700);
+  border-radius: var(--radius-sm);
+  background: var(--gray-900);
+  color: var(--white);
+  padding: 10px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 32px;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.menu-item:hover {
+  background: var(--gray-800);
+  border-color: var(--gray-600);
+}
+
+/* ═══════════════════════════════════════════════════════
    PEDIDOS LIST
    ═══════════════════════════════════════════════════════ */
 .list-area {
-  padding-bottom: 130px;
-  min-height: calc(100vh - 56px - 40px);
+  height: 100%;
+  overflow-y: auto;
 }
 .row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 24px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--gray-900);
   font-size: 14px; font-weight: 500;
   transition: background 0.15s;
@@ -115,39 +166,6 @@ body {
 .empty p { font-size: 14px; }
 
 /* ═══════════════════════════════════════════════════════
-   BOTTOM BAR (fixed)
-   ═══════════════════════════════════════════════════════ */
-.bottom-bar {
-  position: fixed; right: 16px; bottom: 8px;
-  padding: 0;
-  display: flex; gap: 10px; z-index: 60;
-}
-.btn-fazer {
-  padding: 14px 32px; border: none; border-radius: var(--radius-sm);
-  background: var(--red); color: white;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px; font-weight: 700; letter-spacing: 0.5px;
-  cursor: pointer; transition: all 0.2s;
-  box-shadow: 0 4px 20px var(--red-glow);
-}
-.btn-fazer:hover {
-  background: #ef4444;
-  box-shadow: 0 6px 28px rgba(220,38,38,0.4);
-  transform: translateY(-1px);
-}
-.btn-fazer:active { transform: scale(0.97); }
-
-.btn-debug {
-  padding: 12px 20px; border-radius: var(--radius-sm);
-  border: 1px solid var(--gray-700);
-  background: var(--gray-900); color: var(--gray-400);
-  font-family: 'Inter', sans-serif;
-  font-size: 12px; font-weight: 500;
-  cursor: pointer; transition: all 0.15s;
-}
-.btn-debug:hover { border-color: var(--gray-500); color: var(--gray-300); }
-
-/* ═══════════════════════════════════════════════════════
    FOOTER STATUS
    ═══════════════════════════════════════════════════════ */
 .footer {
@@ -162,6 +180,37 @@ body {
   background: var(--red-soft);
   border-top-color: rgba(220,38,38,0.15);
   color: var(--red-light);
+}
+
+@media (max-width: 900px) {
+  body {
+    overflow: auto;
+  }
+
+  .content-layout {
+    height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .list-column {
+    border-right: none;
+  }
+
+  .menu-column {
+    border-top: 1px solid var(--gray-800);
+  }
+
+  .menu-title {
+    font-size: 28px;
+  }
+
+  .menu-item {
+    font-size: 24px;
+  }
+
+  .list-area {
+    max-height: calc(100vh - 56px - 40px - 44px);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════
