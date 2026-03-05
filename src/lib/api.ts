@@ -1,17 +1,79 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim() || "";
+const API_BASE = RAW_API_BASE
+  ? (RAW_API_BASE.startsWith("http://") || RAW_API_BASE.startsWith("https://")
+      ? RAW_API_BASE
+      : `http://${RAW_API_BASE}`)
+  : "";
 const REQUEST_TIMEOUT_MS = 12000;
+const ACCESS_TOKEN_KEY = "grt_access_token";
+const REFRESH_TOKEN_KEY = "grt_refresh_token";
+
+let accessTokenCache: string | null = null;
+let refreshTokenCache: string | null = null;
+let refreshInFlight: Promise<void> | null = null;
 
 type RequestOptionsWithTimeout = RequestInit & {
   timeoutMs?: number;
 };
 
+function isBrowser(): boolean {
+  return typeof window !== "undefined";
+}
+
+function loadTokensFromStorage() {
+  if (!isBrowser()) return;
+  accessTokenCache = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  refreshTokenCache = sessionStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function persistTokens(accessToken: string, refreshToken: string) {
+  accessTokenCache = accessToken;
+  refreshTokenCache = refreshToken;
+  if (!isBrowser()) return;
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+function clearPersistedTokens() {
+  accessTokenCache = null;
+  refreshTokenCache = null;
+  if (!isBrowser()) return;
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+async function refreshAccessToken() {
+  if (!refreshTokenCache) {
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
+  const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshTokenCache }),
+  });
+  if (!res.ok) {
+    clearPersistedTokens();
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
+  const data = await res.json() as AuthTokens;
+  persistTokens(data.access_token, data.refresh_token);
+}
+
 async function fetchAPI<T>(
   path: string,
-  options?: RequestOptionsWithTimeout
+  options?: RequestOptionsWithTimeout,
+  retryOnUnauthorized = true
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (options?.body !== undefined) {
     headers["Content-Type"] = "application/json";
+  }
+
+  if (!accessTokenCache && isBrowser()) {
+    loadTokensFromStorage();
+  }
+  if (accessTokenCache) {
+    headers["Authorization"] = `Bearer ${accessTokenCache}`;
   }
 
   const { timeoutMs = REQUEST_TIMEOUT_MS, ...requestOptions } = options ?? {};
@@ -47,6 +109,22 @@ async function fetchAPI<T>(
   }
 
   if (!res.ok) {
+    if (
+      res.status === 401 &&
+      retryOnUnauthorized &&
+      path !== "/api/auth/login" &&
+      path !== "/api/auth/refresh" &&
+      refreshTokenCache
+    ) {
+      if (!refreshInFlight) {
+        refreshInFlight = refreshAccessToken().finally(() => {
+          refreshInFlight = null;
+        });
+      }
+      await refreshInFlight;
+      return fetchAPI<T>(path, options, false);
+    }
+
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || res.statusText);
   }
@@ -58,6 +136,7 @@ async function fetchAPI<T>(
 export interface Usuario {
   id: number;
   nome: string;
+  ativo: boolean;
 }
 
 export interface CardapioData {
@@ -95,11 +174,106 @@ export interface CardapioPayload {
   multiplos: Record<string, string[]>;
 }
 
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface AdminSecretResponse {
+  secret: string;
+  usuario: string;
+  username: string;
+  can_manage_auto_weekly: boolean;
+}
+
+export interface AutoPedidoSemanal {
+  id: number;
+  usuario_id: number;
+  usuario_nome: string;
+  ativo: boolean;
+  semana_referencia: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface ResumoMensalItem {
+  usuario: string;
+  usuario_id: number;
+  qtde: number;
+  dias: Record<string, number>;
+}
+
+export interface ResumoMensalResponse {
+  resumo: ResumoMensalItem[];
+  data_inicio: string;
+  data_fim: string;
+  gerado: string;
+  dias_no_mes: number[];
+}
+
 // ─── API calls ─────────────────────────────────────────────
 
 export const api = {
+  loadSession: () => {
+    loadTokensFromStorage();
+  },
+  isAuthenticated: () => Boolean(accessTokenCache && refreshTokenCache),
+  login: async (username: string, senha: string) => {
+    const data = await fetchAPI<AuthTokens>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, senha }),
+    }, false);
+    persistTokens(data.access_token, data.refresh_token);
+    return data;
+  },
+  logout: async () => {
+    const token = refreshTokenCache;
+    try {
+      if (token) {
+        await fetchAPI<{ status: string }>("/api/auth/logout", {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: token }),
+        }, false);
+      }
+    } finally {
+      clearPersistedTokens();
+    }
+  },
+  getAdminSecret: () => fetchAPI<AdminSecretResponse>("/api/admin/secret"),
+  getAutoPedidosSemanais: () =>
+    fetchAPI<AutoPedidoSemanal[]>("/api/admin/auto-pedidos-semanais"),
+  getRelatorioMensal: () =>
+    fetchAPI<ResumoMensalResponse>("/api/relatorios/mensal"),
+  getRelatorioMensalAnterior: () =>
+    fetchAPI<ResumoMensalResponse>("/api/relatorios/mensal-anterior"),
+  addAutoPedidoSemanal: (usuario_id: number) =>
+    fetchAPI<AutoPedidoSemanal>("/api/admin/auto-pedidos-semanais", {
+      method: "POST",
+      body: JSON.stringify({ usuario_id }),
+    }),
+  removeAutoPedidoSemanal: (usuario_id: number) =>
+    fetchAPI<void>(`/api/admin/auto-pedidos-semanais/${usuario_id}`, {
+      method: "DELETE",
+    }),
+
   // Usuarios
   getUsuarios: () => fetchAPI<Usuario[]>("/api/usuarios"),
+  getAdminUsuarios: () => fetchAPI<Usuario[]>("/api/admin/usuarios"),
+  criarUsuario: (nome: string, ativo = true) =>
+    fetchAPI<Usuario>("/api/admin/usuarios", {
+      method: "POST",
+      body: JSON.stringify({ nome, ativo }),
+    }),
+  setUsuarioStatus: (usuarioId: number, ativo: boolean) =>
+    fetchAPI<Usuario>(`/api/admin/usuarios/${usuarioId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ ativo }),
+    }),
+  deletarUsuario: (usuarioId: number) =>
+    fetchAPI<void>(`/api/admin/usuarios/${usuarioId}`, {
+      method: "DELETE",
+    }),
 
   // Cardápio
   getCardapio: () => fetchAPI<CardapioData | null>("/api/cardapio"),
@@ -140,7 +314,12 @@ export const api = {
 export function createWS(onMessage: (msg: { tipo: string; dados: unknown }) => void) {
   let wsUrl = "";
   if (API_BASE) {
-    wsUrl = API_BASE.replace(/^http/, "ws") + "/ws";
+    const apiUrl = new URL(API_BASE);
+    apiUrl.protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+    apiUrl.pathname = "/ws";
+    apiUrl.search = "";
+    apiUrl.hash = "";
+    wsUrl = apiUrl.toString();
   } else {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     wsUrl = `${protocol}//${window.location.host}/ws`;
